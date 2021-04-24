@@ -1,0 +1,3 @@
+p, creator, api/event/insert, POST
+p, creator, api/event/update, PUT
+p, creator, api/event/, GET
