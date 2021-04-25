@@ -5,7 +5,7 @@ import (
 )
 
 type InsertEventDTO struct {
-	CreatorId         uint64    `json:"creator_id" form:"creator_id" binding:"required"`
+	CreatorId         uint64    `json:"creator_id" form:"creator_id"`
 	TitleEvent        string    `json:"title_event" form:"title_event" binding:"required"`
 	LinkWebinar       string    `json:"link_webinar" form:"link_webinar" binding:"required"`
 	Description       string    `json:"description" form:"description" binding:"required"`

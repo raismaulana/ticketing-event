@@ -12,7 +12,7 @@ type Transaction struct {
 	Amount        float32      `gorm:"type:float(15,2)"`
 	StatusPayment string       `gorm:"type:enum('passed', 'failed');default:NULL" json:"status_payment"`
 	DeletedAt     sql.NullTime `gorm:"type:timestamp null;default:null" json:"deleted_at"`
-	CreatedAt     time.Time    `gorm:"type:timestamp not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	CreatedAt     time.Time    `gorm:"<-:create;type:timestamp not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt     time.Time    `gorm:"type:timestamp not null ON UPDATE CURRENT_TIMESTAMP();default:CURRENT_TIMESTAMP" json:"Updated_at"`
 }
 

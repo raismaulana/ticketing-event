@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"log"
+
 	"github.com/raismaulana/ticketing-event/app/entity"
 	"gorm.io/gorm"
 )
@@ -11,6 +13,7 @@ type TransactionRepository interface {
 	Update(transaction entity.Transaction) (entity.Transaction, error)
 	Insert(transaction entity.Transaction) (entity.Transaction, error)
 	Delete(transaction entity.Transaction) (entity.Transaction, error)
+	GetByParticipantAndEventId(participantId uint64, eventId uint64) (entity.Transaction, error)
 }
 
 type transactionRepository struct {
@@ -47,5 +50,13 @@ func (db *transactionRepository) Insert(transaction entity.Transaction) (entity.
 
 func (db *transactionRepository) Delete(transaction entity.Transaction) (entity.Transaction, error) {
 	tx := db.connection.Model(&transaction).Update("deleted_at", transaction.DeletedAt.Time)
+	return transaction, tx.Error
+}
+
+func (db *transactionRepository) GetByParticipantAndEventId(participantId uint64, eventId uint64) (entity.Transaction, error) {
+	var transaction entity.Transaction
+	tx := db.connection.Raw("SELECT * FROM `transaction` WHERE `transaction`.`participant_id` = ? AND `transaction`.`event_id` = ?", participantId, eventId).Scan(&transaction)
+	log.Println(tx.Error)
+	log.Println(transaction)
 	return transaction, tx.Error
 }

@@ -17,6 +17,7 @@ type TransactionController interface {
 	GetByID(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+	BuyEvent(c *gin.Context)
 }
 
 type transactionController struct {
@@ -103,4 +104,31 @@ func (ctrl *transactionController) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, helper.BuildResponse(true, "Deleted!", helper.EmptyObj{}))
+}
+
+func (ctrl *transactionController) BuyEvent(c *gin.Context) {
+	var buyEventDTO dto.BuyEventDTO
+
+	if err := c.ShouldBind(&buyEventDTO); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, helper.BuildErrorResponse("error", err.Error(), helper.EmptyObj{}))
+		return
+	}
+
+	participantId, ok := c.MustGet("user_id").(string)
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, helper.BuildErrorResponse("error", "Token invalid", helper.EmptyObj{}))
+		return
+	}
+	parsedparticipantId, errParse := strconv.ParseUint(participantId, 10, 64)
+	if errParse != nil {
+		panic(errParse)
+	}
+
+	buyEventDTO.ParticipantId = parsedparticipantId
+	transaction, errRes := ctrl.transactionCase.BuyEvent(buyEventDTO)
+	if errRes != nil {
+		c.AbortWithStatusJSON(http.StatusConflict, helper.BuildErrorResponse("Failed Buy Event", errRes.Error(), transaction))
+		return
+	}
+	c.JSON(http.StatusCreated, helper.BuildResponse(true, "Check out success", transaction))
 }

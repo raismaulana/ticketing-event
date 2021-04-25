@@ -23,7 +23,7 @@ var (
 	eventCase             usecase.EventCase                = usecase.NewEventCase(eventRepository)
 	jwtCase               usecase.JWTCase                  = usecase.NewJWTCase()
 	redisCase             usecase.RedisCase                = usecase.NewRedisCase(rdb)
-	transactionCase       usecase.TransactionCase          = usecase.NewTransactionCase(transactionRepository)
+	transactionCase       usecase.TransactionCase          = usecase.NewTransactionCase(transactionRepository, eventRepository)
 	userCase              usecase.UserCase                 = usecase.NewUserCase(userRepository)
 	authController        controller.AuthController        = controller.NewAuthController(authCase, jwtCase)
 	eventController       controller.EventController       = controller.NewEventController(eventCase, redisCase)
@@ -35,10 +35,16 @@ func main() {
 	defer config.CloseDatabaseConnection(db)
 
 	r := gin.Default()
-	guestRoutes := r.Group("api")
+	initRoutes(r)
+
+	r.Run()
+}
+
+func initRoutes(r *gin.Engine) {
+	guestRoutes := r.Group("api/auth")
 	{
-		guestRoutes.POST("/auth/login", authController.Login)
-		guestRoutes.POST("/auth/register", authController.Register)
+		guestRoutes.POST("/login", authController.Login)
+		guestRoutes.POST("/register", authController.Register)
 	}
 
 	routes := r.Group("api")
@@ -55,11 +61,10 @@ func main() {
 		eventRoutes := routes.Group("/event")
 		{
 			eventRoutes.POST("/insert", eventController.Insert)
-			eventRoutes.GET("/", eventController.Fetch)
+			eventRoutes.GET("/", middleware.GetCache(redisCase), eventController.Fetch)
 			eventRoutes.GET("/:id", eventController.GetByID)
 			eventRoutes.PUT("/update", eventController.Update)
 			eventRoutes.DELETE("/delete/:id", eventController.Delete)
-			eventRoutes.GET("/test", eventController.Test)
 		}
 
 		transactionRoutes := routes.Group("/transaction")
@@ -70,6 +75,11 @@ func main() {
 			transactionRoutes.PUT("/update", transactionController.Update)
 			transactionRoutes.DELETE("/delete/:id", transactionController.Delete)
 		}
+
+		customRoutes := routes.Group("")
+		{
+			customRoutes.GET("/event/available", middleware.GetCache(redisCase), eventController.FetchAvailable)
+			customRoutes.POST("/transaction/buy-event", transactionController.BuyEvent)
+		}
 	}
-	r.Run()
 }

@@ -13,6 +13,7 @@ import (
 type EventCase interface {
 	Insert(input dto.InsertEventDTO) (entity.Event, error)
 	Fetch() ([]entity.Event, error)
+	FetchAvailable() ([]entity.Event, error)
 	GetByID(id uint64) (entity.Event, error)
 	Update(input dto.UpdateEventDTO) (entity.Event, error)
 	Delete(id uint64, deleted_at time.Time) (entity.Event, error)
@@ -45,6 +46,14 @@ func (service *eventCase) Insert(input dto.InsertEventDTO) (entity.Event, error)
 
 func (service *eventCase) Fetch() ([]entity.Event, error) {
 	events, err := service.eventRepository.Fetch()
+	if err != nil {
+		log.Println(err)
+	}
+	return events, err
+}
+
+func (service *eventCase) FetchAvailable() ([]entity.Event, error) {
+	events, err := service.eventRepository.FetchAvailable()
 	if err != nil {
 		log.Println(err)
 	}

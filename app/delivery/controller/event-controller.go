@@ -7,7 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/raismaulana/ticketing-event/app/dto"
-	"github.com/raismaulana/ticketing-event/app/entity"
 	"github.com/raismaulana/ticketing-event/app/helper"
 	"github.com/raismaulana/ticketing-event/app/usecase"
 )
@@ -18,7 +17,7 @@ type EventController interface {
 	GetByID(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
-	Test(c *gin.Context)
+	FetchAvailable(c *gin.Context)
 }
 
 type eventController struct {
@@ -40,12 +39,23 @@ func (ctrl *eventController) Insert(c *gin.Context) {
 		return
 	}
 
+	creatorId, ok := c.MustGet("user_id").(string)
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, helper.BuildErrorResponse("error", "Token invalid", helper.EmptyObj{}))
+		return
+	}
+	parsedCreatorId, errParse := strconv.ParseUint(creatorId, 10, 64)
+	if errParse != nil {
+		panic(errParse)
+	}
+
+	insertEventDTO.CreatorId = parsedCreatorId
 	event, err := ctrl.eventCase.Insert(insertEventDTO)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusConflict, helper.BuildErrorResponse("error", err.Error(), helper.EmptyObj{}))
 		return
 	}
-
+	ctrl.redisCase.Delete(helper.CACHE_FETCH_EVENT_LIST, helper.CACHE_FETCH_AVAILABLE_EVENT_LIST)
 	c.JSON(http.StatusCreated, helper.BuildResponse(true, "OK!", event))
 }
 
@@ -57,17 +67,22 @@ func (ctrl *eventController) Fetch(c *gin.Context) {
 		return
 	}
 
-	ctrl.redisCase.Set(c.FullPath(), events)
+	ctrl.redisCase.Set(helper.CACHE_FETCH_EVENT_LIST, events)
 	c.JSON(http.StatusOK, helper.BuildResponse(true, "OK!", events))
 }
-func (ctrl *eventController) Test(c *gin.Context) {
-	var events []entity.Event
-	obj, err := ctrl.redisCase.Get("/api/event/", events)
-	if err != nil {
-		panic(err)
+
+func (ctrl *eventController) FetchAvailable(c *gin.Context) {
+	events, errRes := ctrl.eventCase.FetchAvailable()
+
+	if errRes != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, helper.BuildErrorResponse("error", errRes.Error(), helper.EmptyObj{}))
+		return
 	}
-	c.JSON(http.StatusOK, helper.BuildResponse(true, "OK!", obj))
+
+	ctrl.redisCase.Set(helper.CACHE_FETCH_AVAILABLE_EVENT_LIST, events)
+	c.JSON(http.StatusOK, helper.BuildResponse(true, "OK!", events))
 }
+
 func (ctrl *eventController) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -97,6 +112,7 @@ func (ctrl *eventController) Update(c *gin.Context) {
 		return
 	}
 
+	ctrl.redisCase.Delete(helper.CACHE_FETCH_EVENT_LIST, helper.CACHE_FETCH_AVAILABLE_EVENT_LIST)
 	c.JSON(http.StatusOK, helper.BuildResponse(true, "OK!", event))
 }
 
@@ -112,5 +128,6 @@ func (ctrl *eventController) Delete(c *gin.Context) {
 		return
 	}
 
+	ctrl.redisCase.Delete(helper.CACHE_FETCH_EVENT_LIST)
 	c.JSON(http.StatusOK, helper.BuildResponse(true, "Deleted!", helper.EmptyObj{}))
 }

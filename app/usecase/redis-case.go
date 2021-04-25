@@ -11,7 +11,8 @@ import (
 
 type RedisCase interface {
 	Set(key string, value interface{}) error
-	Get(key string, v interface{}) (interface{}, error)
+	Get(key string, v interface{}) error
+	Delete(key ...string)
 }
 
 type redisCase struct {
@@ -33,8 +34,6 @@ func (service *redisCase) Set(key string, value interface{}) error {
 		return err
 	}
 
-	log.Println(key)
-	log.Println(string(json))
 	errSet := service.rdb.Set(service.ctx, key, string(json), time.Second*300).Err()
 	if errSet != nil {
 		log.Println(errSet)
@@ -44,20 +43,22 @@ func (service *redisCase) Set(key string, value interface{}) error {
 	return nil
 }
 
-func (service *redisCase) Get(key string, v interface{}) (interface{}, error) {
-
+func (service *redisCase) Get(key string, v interface{}) error {
 	if val, err := service.rdb.Get(service.ctx, key).Result(); err == redis.Nil {
-		log.Println("%key does not exist")
-		return nil, err
+		log.Println(key, " does not exist")
+		return err
 	} else if err != nil {
 		log.Println(err)
-		return nil, err
+		return err
 	} else {
 		errs := json.Unmarshal([]byte(val), &v)
-		return v, errs
+		return errs
 	}
 }
 
-func (service *redisCase) Delete(key string) {
-	service.rdb.Del(service.ctx, key)
+func (service *redisCase) Delete(key ...string) {
+	for _, v := range key {
+		service.rdb.Del(service.ctx, v)
+	}
+
 }

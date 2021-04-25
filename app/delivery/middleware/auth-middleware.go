@@ -29,13 +29,13 @@ func AuthMiddleware(jwtCase usecase.JWTCase, e *casbin.Enforcer) gin.HandlerFunc
 			return
 		}
 		claims := token.Claims.(jwt.MapClaims)
-		ok := checkPermission(claims, c.Request, e)
+		user_id, ok := checkPermission(claims, c.Request, e)
 		if !ok {
 			response := helper.BuildErrorResponse("Forbidden", "You don't have authorization to access this URL", nil)
 			c.AbortWithStatusJSON(http.StatusForbidden, response)
 			return
 		}
-
+		c.Set("user_id", user_id)
 		c.Next()
 	}
 
@@ -43,15 +43,19 @@ func AuthMiddleware(jwtCase usecase.JWTCase, e *casbin.Enforcer) gin.HandlerFunc
 
 // CheckPermission checks the user/method/path combination from the request.
 // Returns true (permission granted) or false (permission forbidden)
-func checkPermission(claims jwt.MapClaims, r *http.Request, e *casbin.Enforcer) bool {
-	_, ok := claims["user_id"].(string)
+func checkPermission(claims jwt.MapClaims, r *http.Request, e *casbin.Enforcer) (string, bool) {
+	user_id, ok := claims["user_id"].(string)
 	role, ok2 := claims["role"].(string)
 	if !(ok && ok2) {
-		return false
+		return user_id, false
 	}
 	user := role
 	method := r.Method
 	path := r.URL.Path
+	log.Println(user)
+	log.Println(method)
+	log.Println(path)
+	log.Println(user_id)
 	ok3 := e.Enforce(user, path, method)
-	return ok3
+	return user_id, ok3
 }

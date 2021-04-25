@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -38,7 +39,8 @@ func (ctrl *authController) Login(c *gin.Context) {
 	}
 	result := ctrl.authCase.Login(loginDTO)
 	if v, ok := result.(entity.User); ok {
-		v.Token = ctrl.jwtCase.GenerateToken(strconv.FormatUint(v.ID, 10), v.Token)
+		v.Token = ctrl.jwtCase.GenerateToken(strconv.FormatUint(v.ID, 10), v.Role)
+		log.Println(v)
 		response := helper.BuildResponse(true, "Login Success!", v)
 		c.JSON(http.StatusOK, response)
 		return

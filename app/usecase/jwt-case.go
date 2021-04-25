@@ -34,12 +34,12 @@ func NewJWTCase() JWTCase {
 func (service *jwtCase) GenerateToken(userID string, role string) string {
 	claims := &authCustomClaim{
 		jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Hour * 48).Unix(),
+			ExpiresAt: time.Now().Add(time.Hour * 12).Unix(),
 			Issuer:    service.issuer,
 			IssuedAt:  time.Now().Unix(),
 		},
-		role,
 		userID,
+		role,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
