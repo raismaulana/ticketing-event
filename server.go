@@ -1,12 +1,16 @@
 package main
 
 import (
+	"log"
+	"net/http"
+
 	"github.com/casbin/casbin"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/raismaulana/ticketing-event/app/config"
 	"github.com/raismaulana/ticketing-event/app/delivery/controller"
 	"github.com/raismaulana/ticketing-event/app/delivery/middleware"
+	"github.com/raismaulana/ticketing-event/app/entity"
 	"github.com/raismaulana/ticketing-event/app/repository"
 	"github.com/raismaulana/ticketing-event/app/usecase"
 	"gorm.io/gorm"
@@ -80,6 +84,59 @@ func initRoutes(r *gin.Engine) {
 		{
 			customRoutes.GET("/event/available", middleware.GetCache(redisCase), eventController.FetchAvailable)
 			customRoutes.POST("/transaction/buy-event", transactionController.BuyEvent)
+			// customRoutes.GET("/report/transaction", userController.AllEventReport)
+			customRoutes.GET("/report/transaction", func(c *gin.Context) {
+				rows, _ := db.Raw("SELECT c.id as cid, e.id as eid, t.id as tid, p.id as pid, p.fullname as pfullname FROM `users` c JOIN event e on c.id = e.creator_id JOIN transaction t on e.id = t.event_id JOIN users p on t.participant_id = p.id WHERE t.status_payment = 'passed'").Rows()
+				cols, _ := rows.Columns()
+				result := make(map[string]string)
+				var results []interface{}
+				for rows.Next() {
+					columns := make([]string, len(cols))
+					columnPointers := make([]interface{}, len(cols))
+					for i := range columns {
+						columnPointers[i] = &columns[i]
+						log.Println(columnPointers[i], " ", columns[i])
+					}
+					rows.Scan(columnPointers...)
+					for i, colName := range cols {
+						result[colName] = columns[i]
+					}
+					results = append(results, result)
+				}
+				log.Println(rows)
+				log.Println(result)
+				log.Println(results)
+				c.JSON(http.StatusOK, results)
+			})
+			customRoutes.GET("/report/creator", func(c *gin.Context) {
+				creator_id := c.MustGet("user_id")
+				var reportCreator []ReportCreator
+				var detailWebinar DetailWebinar
+
+				tx := db.Raw("SELECT e.*, SUM(t.amount) `total_amount`, COUNT(t.participant_id) `total_participant` FROM `transaction` t JOIN event e on e.id = t.event_id WHERE e.creator_id = 12 AND t.status_payment = 'passed' AND e.event_end_date <= NOW() GROUP BY t.id ORDER BY t.id", creator_id).Scan(&detailWebinar)
+
+				log.Println(tx.Rows())
+				log.Println(detailWebinar)
+				log.Println(reportCreator)
+
+				// rows, _ := db.Raw("SELECT c.id as cid, e.id as eid, e.event_end_date, t.id as tid, p.id as pid, p.fullname as pfullname FROM `users` c JOIN event e on c.id = e.creator_id JOIN transaction t on e.id = t.event_id JOIN users p on t.participant_id = p.id WHERE e.creator_id = ? AND t.status_payment = 'passed' AND e.event_end_date <= NOW()", creator_id).Rows()
+
+				// for sum.Next() {
+				// 	reportCreator[i].jumlah_participant = sum
+				// }
+				c.JSON(http.StatusOK, detailWebinar)
+			})
 		}
 	}
+}
+
+type ReportCreator struct {
+	DetailWebinar DetailWebinar
+	Participant   []entity.User
+}
+
+type DetailWebinar struct {
+	Event            entity.Event `gorm:"embedded"`
+	TotalAmount      float64      `gorm:"->" json:"total_amount"`
+	TotalParticipant int          `gorm:"->" json:"total_participant"`
 }

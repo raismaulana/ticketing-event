@@ -16,6 +16,7 @@ type UserController interface {
 	GetByID(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+	AllEventReport(c *gin.Context)
 }
 
 type userController struct {
@@ -86,4 +87,13 @@ func (ctrl *userController) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, helper.BuildResponse(true, "Deleted!", helper.EmptyObj{}))
+}
+
+func (ctrl *userController) AllEventReport(c *gin.Context) {
+	users, err := ctrl.userCase.AllEventReport()
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusNoContent, helper.BuildErrorResponse("error", err.Error(), helper.EmptyObj{}))
+		return
+	}
+	c.JSON(http.StatusOK, helper.BuildResponse(true, "ok", users))
 }

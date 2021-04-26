@@ -58,8 +58,8 @@ func (ctrl *authController) Register(c *gin.Context) {
 	}
 
 	_, err1 := ctrl.authCase.IsDuplicateUnique(registerDTO.Username, registerDTO.Email)
-	if err1 == nil {
-		response := helper.BuildErrorResponse("Register Failed!", "username or email already exists", helper.EmptyObj{})
+	if err1 != nil {
+		response := helper.BuildErrorResponse("Register Failed!", err1.Error(), helper.EmptyObj{})
 		c.JSON(http.StatusConflict, response)
 		return
 	}

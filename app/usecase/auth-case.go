@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"log"
 
 	"github.com/mashingan/smapping"
@@ -49,6 +50,9 @@ func (service *authCase) Register(input dto.RegisterUserDTO) (entity.User, error
 }
 
 func (service *authCase) IsDuplicateUnique(username string, email string) (entity.User, error) {
-	user, err := service.userRepository.GetByUnique(username, email)
-	return user, err
+	user, _ := service.userRepository.GetByUnique(username, email)
+	if user.ID > 0 {
+		return user, errors.New("duplicate username or email")
+	}
+	return user, nil
 }

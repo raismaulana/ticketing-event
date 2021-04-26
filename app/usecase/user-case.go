@@ -7,6 +7,7 @@ import (
 	"github.com/mashingan/smapping"
 	"github.com/raismaulana/ticketing-event/app/dto"
 	"github.com/raismaulana/ticketing-event/app/entity"
+	"github.com/raismaulana/ticketing-event/app/helper"
 	"github.com/raismaulana/ticketing-event/app/repository"
 )
 
@@ -15,6 +16,7 @@ type UserCase interface {
 	GetByID(id uint64) (entity.User, error)
 	Update(input dto.UpdateUserDTO) (entity.User, error)
 	Delete(id uint64, deleted_at time.Time) (entity.User, error)
+	AllEventReport() ([]entity.User, error)
 }
 
 type userCase struct {
@@ -49,6 +51,11 @@ func (service *userCase) Update(input dto.UpdateUserDTO) (entity.User, error) {
 	if err != nil {
 		log.Println(err)
 	}
+	if user.Password == "" {
+		a, _ := service.userRepository.GetByID(user.ID)
+		user.Password = a.Password
+	}
+	user.Password = helper.PasswordHash(user.Password)
 	resUser, err := service.userRepository.Update(user)
 	if err != nil {
 		log.Println(err)
@@ -66,4 +73,9 @@ func (service *userCase) Delete(id uint64, deleted_at time.Time) (entity.User, e
 		log.Println(err)
 	}
 	return resUser, err
+}
+
+func (service *userCase) AllEventReport() ([]entity.User, error) {
+	users, err := service.userRepository.GetAllUserJoinEvent()
+	return users, err
 }
