@@ -10,6 +10,7 @@ type Transaction struct {
 	ParticipantId uint64       `json:"participant_id"`
 	EventID       uint64       `gorm:"type: not null" json:"event_id"`
 	Amount        float32      `gorm:"type:float(15,2)"`
+	Receipt       string       `gorm:"type:text" json:"receipt"`
 	StatusPayment string       `gorm:"type:enum('passed', 'failed');default:NULL" json:"status_payment"`
 	DeletedAt     sql.NullTime `gorm:"type:timestamp null;default:null" json:"deleted_at"`
 	CreatedAt     time.Time    `gorm:"<-:create;type:timestamp not null;default:CURRENT_TIMESTAMP" json:"created_at"`

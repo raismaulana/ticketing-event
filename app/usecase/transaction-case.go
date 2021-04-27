@@ -1,9 +1,14 @@
 package usecase
 
 import (
+	"bytes"
+	"encoding/base64"
 	"errors"
+	"image/png"
 	"log"
+	"os"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/mashingan/smapping"
@@ -19,6 +24,7 @@ type TransactionCase interface {
 	Update(input dto.UpdateTransactionDTO) (entity.Transaction, error)
 	Delete(id uint64, deleted_at time.Time) (entity.Transaction, error)
 	BuyEvent(input dto.BuyEventDTO) (entity.Transaction, error)
+	UploadReceipt(input dto.UploadReceipt) (entity.Transaction, error)
 }
 
 type transactionCase struct {
@@ -92,7 +98,7 @@ func (service *transactionCase) Delete(id uint64, deleted_at time.Time) (entity.
 }
 
 func (service *transactionCase) BuyEvent(input dto.BuyEventDTO) (entity.Transaction, error) {
-	if transaction, err := service.transactionRepository.GetByParticipantAndEventId(input.ParticipantId, input.EventID); err == nil {
+	if transaction, _ := service.transactionRepository.GetByParticipantAndEventId(input.ParticipantId, input.EventID); transaction.ID != 0 {
 		log.Println(transaction.StatusPayment, ":a ", reflect.TypeOf(transaction.StatusPayment))
 		if transaction.StatusPayment == "passed" {
 			log.Println(transaction.StatusPayment, ":b ", reflect.TypeOf(transaction.StatusPayment))
@@ -128,4 +134,32 @@ func (service *transactionCase) BuyEvent(input dto.BuyEventDTO) (entity.Transact
 		}
 		return resTransaction, err
 	}
+}
+
+func (service *transactionCase) UploadReceipt(input dto.UploadReceipt) (entity.Transaction, error) {
+	transaction := entity.Transaction{}
+
+	unbased, err := base64.StdEncoding.DecodeString(input.ImgReceipt)
+	if err != nil {
+		return transaction, errors.New("Cannot decode b64")
+	}
+
+	r := bytes.NewReader(unbased)
+	im, err := png.Decode(r)
+	if err != nil {
+		return transaction, errors.New("Bad png")
+	}
+	a := strconv.Itoa(int(input.ID))
+	b := strconv.Itoa(int(input.ParticipantId))
+	c := strconv.Itoa(int(time.Now().Unix()))
+	path := "data/" + base64.StdEncoding.EncodeToString([]byte(a+b+c))
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0777)
+	if err != nil {
+		return transaction, errors.New("Cannot open file")
+	}
+
+	png.Encode(f, im)
+	log.Println(path)
+	res, errRes := service.transactionRepository.UploadReceipt(input.ID, path)
+	return res, errRes
 }

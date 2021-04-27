@@ -20,3 +20,9 @@ type BuyEventDTO struct {
 	EventID       uint64  `json:"event_id" form:"event_id" binding:"required"`
 	Amount        float32 `json:"amount" form:"amount" binding:"required"`
 }
+
+type UploadReceipt struct {
+	ParticipantId uint64 `json:"participant_id,omitempty" form:"participant_id,omitempty"`
+	ID            uint64 `json:"transaction_id" form:"transaction_id" binding:"required"`
+	ImgReceipt    string `json:"receipt" form:"receipt" binding:"required"`
+}

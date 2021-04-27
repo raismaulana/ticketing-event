@@ -18,16 +18,19 @@ type TransactionController interface {
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
 	BuyEvent(c *gin.Context)
+	UploadReceipt(c *gin.Context)
 }
 
 type transactionController struct {
 	transactionCase usecase.TransactionCase
+	userCase        usecase.UserCase
 	redisCase       usecase.RedisCase
 }
 
-func NewTransactionController(transactionCase usecase.TransactionCase, redisCase usecase.RedisCase) TransactionController {
+func NewTransactionController(transactionCase usecase.TransactionCase, userCase usecase.UserCase, redisCase usecase.RedisCase) TransactionController {
 	return &transactionController{
 		transactionCase: transactionCase,
+		userCase:        userCase,
 		redisCase:       redisCase,
 	}
 }
@@ -130,5 +133,38 @@ func (ctrl *transactionController) BuyEvent(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusConflict, helper.BuildErrorResponse("Failed Buy Event", errRes.Error(), transaction))
 		return
 	}
-	c.JSON(http.StatusCreated, helper.BuildResponse(true, "Check out success", transaction))
+	user, err := ctrl.userCase.GetByID(parsedparticipantId)
+	if err == nil {
+		helper.SendMail(user.Email, "Pay Your Event ticket", "You can transafer using this method")
+	}
+	c.JSON(http.StatusCreated, helper.BuildResponse(true, "Check out success, check your email", transaction))
+}
+
+func (ctrl *transactionController) UploadReceipt(c *gin.Context) {
+	participantId, ok := c.MustGet("user_id").(string)
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, helper.BuildErrorResponse("error", "Token invalid", helper.EmptyObj{}))
+		return
+	}
+
+	var uploadReceipt dto.UploadReceipt
+
+	if err := c.ShouldBind(&uploadReceipt); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, helper.BuildErrorResponse("error", err.Error(), helper.EmptyObj{}))
+		return
+	}
+
+	parsedparticipantId, errParse := strconv.ParseUint(participantId, 10, 64)
+	if errParse != nil {
+		panic(errParse)
+	}
+	uploadReceipt.ParticipantId = parsedparticipantId
+
+	transaction, errRes := ctrl.transactionCase.UploadReceipt(uploadReceipt)
+	if errRes != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, helper.BuildErrorResponse("Failed Upload", errRes.Error(), transaction))
+		return
+	}
+
+	c.JSON(http.StatusCreated, helper.BuildResponse(true, "Upload Success, Wait for verified", transaction))
 }

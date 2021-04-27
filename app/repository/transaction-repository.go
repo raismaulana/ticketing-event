@@ -14,6 +14,7 @@ type TransactionRepository interface {
 	Insert(transaction entity.Transaction) (entity.Transaction, error)
 	Delete(transaction entity.Transaction) (entity.Transaction, error)
 	GetByParticipantAndEventId(participantId uint64, eventId uint64) (entity.Transaction, error)
+	UploadReceipt(id uint64, path string) (entity.Transaction, error)
 }
 
 type transactionRepository struct {
@@ -59,4 +60,9 @@ func (db *transactionRepository) GetByParticipantAndEventId(participantId uint64
 	log.Println(tx.Error)
 	log.Println(transaction)
 	return transaction, tx.Error
+}
+
+func (db *transactionRepository) UploadReceipt(id uint64, path string) (entity.Transaction, error) {
+	tx := db.connection.Exec("UPDATE `transaction` SET `receipt` = ? WHERE `transaction`.`id` = ?", path, id)
+	return entity.Transaction{}, tx.Error
 }

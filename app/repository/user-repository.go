@@ -2,6 +2,7 @@ package repository
 
 import (
 	"log"
+	"time"
 
 	"github.com/raismaulana/ticketing-event/app/entity"
 	"gorm.io/gorm"
@@ -17,6 +18,7 @@ type UserRepository interface {
 	Insert(user entity.User) (entity.User, error)
 	Delete(user entity.User) (entity.User, error)
 	GetAllUserJoinEvent() ([]entity.User, error)
+	GetParticipant(creator_id uint64) ([]entity.Participant, error)
 }
 
 type userRepository struct {
@@ -98,4 +100,10 @@ func (db *userRepository) GetAllUserJoinEvent() ([]entity.User, error) {
 	log.Println(transactions)
 
 	return users, tx.Error
+}
+
+func (db *userRepository) GetParticipant(creator_id uint64) ([]entity.Participant, error) {
+	var participants []entity.Participant
+	tx := db.connection.Raw("SELECT p.*, t.event_id as eid FROM `users` p JOIN transaction t on p.id = t.participant_id JOIN event e on t.event_id = e.id WHERE e.creator_id = ? AND t.status_payment = 'passed' AND e.event_end_date <= ? ORDER BY t.id", creator_id, time.Now()).Scan(&participants)
+	return participants, tx.Error
 }

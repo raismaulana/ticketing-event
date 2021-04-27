@@ -11,6 +11,7 @@ import (
 	"github.com/raismaulana/ticketing-event/app/delivery/controller"
 	"github.com/raismaulana/ticketing-event/app/delivery/middleware"
 	"github.com/raismaulana/ticketing-event/app/entity"
+	"github.com/raismaulana/ticketing-event/app/helper"
 	"github.com/raismaulana/ticketing-event/app/repository"
 	"github.com/raismaulana/ticketing-event/app/usecase"
 	"gorm.io/gorm"
@@ -27,12 +28,14 @@ var (
 	eventCase             usecase.EventCase                = usecase.NewEventCase(eventRepository)
 	jwtCase               usecase.JWTCase                  = usecase.NewJWTCase()
 	redisCase             usecase.RedisCase                = usecase.NewRedisCase(rdb)
+	reportCase            usecase.ReportCase               = usecase.NewReportCase(userRepository, eventRepository, transactionRepository)
 	transactionCase       usecase.TransactionCase          = usecase.NewTransactionCase(transactionRepository, eventRepository)
 	userCase              usecase.UserCase                 = usecase.NewUserCase(userRepository)
 	authController        controller.AuthController        = controller.NewAuthController(authCase, jwtCase)
 	eventController       controller.EventController       = controller.NewEventController(eventCase, redisCase)
-	transactionController controller.TransactionController = controller.NewTransactionController(transactionCase, redisCase)
+	transactionController controller.TransactionController = controller.NewTransactionController(transactionCase, userCase, redisCase)
 	userController        controller.UserController        = controller.NewUserController(userCase, redisCase)
+	reportController      controller.ReportController      = controller.NewReportController(reportCase)
 )
 
 func main() {
@@ -108,35 +111,35 @@ func initRoutes(r *gin.Engine) {
 				log.Println(results)
 				c.JSON(http.StatusOK, results)
 			})
-			customRoutes.GET("/report/creator", func(c *gin.Context) {
-				creator_id := c.MustGet("user_id")
-				var reportCreator []ReportCreator
-				var detailWebinar DetailWebinar
-
-				tx := db.Raw("SELECT e.*, SUM(t.amount) `total_amount`, COUNT(t.participant_id) `total_participant` FROM `transaction` t JOIN event e on e.id = t.event_id WHERE e.creator_id = 12 AND t.status_payment = 'passed' AND e.event_end_date <= NOW() GROUP BY t.id ORDER BY t.id", creator_id).Scan(&detailWebinar)
-
-				log.Println(tx.Rows())
-				log.Println(detailWebinar)
-				log.Println(reportCreator)
-
-				// rows, _ := db.Raw("SELECT c.id as cid, e.id as eid, e.event_end_date, t.id as tid, p.id as pid, p.fullname as pfullname FROM `users` c JOIN event e on c.id = e.creator_id JOIN transaction t on e.id = t.event_id JOIN users p on t.participant_id = p.id WHERE e.creator_id = ? AND t.status_payment = 'passed' AND e.event_end_date <= NOW()", creator_id).Rows()
-
-				// for sum.Next() {
-				// 	reportCreator[i].jumlah_participant = sum
-				// }
-				c.JSON(http.StatusOK, detailWebinar)
+			customRoutes.GET("/report/creator", reportController.FetchAllReportEventByCreator)
+			customRoutes.PUT("/transaction/upload", transactionController.UploadReceipt)
+			customRoutes.PUT("/transaction/verify", func(c *gin.Context) {
+				var verify Verify
+				c.ShouldBindJSON(&verify)
+				log.Println(verify)
+				log.Println(verify.TransactionId)
+				log.Println(verify.Status)
+				db.Exec("UPDATE transaction SET status_payment = ? WHERE id = ?", verify.Status, verify.TransactionId)
+				var user entity.User
+				var event entity.Event
+				db.Raw("Select p.email FROM users p JOIN transaction t on p.id = t.participant_id WHERE t.`id` = ?", verify.TransactionId).Scan(&user)
+				db.Raw("Select e.link_webinar, e.id FROM event e JOIN transaction t ON t.event_id = e.id WHERE t.`id` = ?", verify.TransactionId).Scan(&event)
+				if verify.Status == "passed" {
+					helper.SendMail(user.Email, "Here We Bring Your Webinar's Link", "we received your payment, here is your link:"+event.LinkWebinar)
+				} else if verify.Status == "failed" {
+					helper.SendMail(user.Email, "Failed Payment", "Sorry, your payment is invalid:")
+					db.Exec("Update event SET quantity = quantity+1 WHERE id = ?", event.ID)
+				} else {
+					c.AbortWithStatusJSON(http.StatusBadRequest, helper.BuildErrorResponse("?", "?", helper.EmptyObj{}))
+					return
+				}
+				c.JSON(http.StatusOK, helper.BuildResponse(true, "OK!", helper.EmptyObj{}))
 			})
 		}
 	}
 }
 
-type ReportCreator struct {
-	DetailWebinar DetailWebinar
-	Participant   []entity.User
-}
-
-type DetailWebinar struct {
-	Event            entity.Event `gorm:"embedded"`
-	TotalAmount      float64      `gorm:"->" json:"total_amount"`
-	TotalParticipant int          `gorm:"->" json:"total_participant"`
+type Verify struct {
+	TransactionId uint64 `form:"transaction_id" json:"transaction_id" binding:"required"`
+	Status        string `form:"status" json:"status" binding:"required"`
 }
