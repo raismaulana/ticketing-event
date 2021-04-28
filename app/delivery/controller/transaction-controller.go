@@ -19,6 +19,7 @@ type TransactionController interface {
 	Delete(c *gin.Context)
 	BuyEvent(c *gin.Context)
 	UploadReceipt(c *gin.Context)
+	VerifyPayment(c *gin.Context)
 }
 
 type transactionController struct {
@@ -167,4 +168,20 @@ func (ctrl *transactionController) UploadReceipt(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, helper.BuildResponse(true, "Upload Success, Wait for verified", transaction))
+}
+
+func (ctrl *transactionController) VerifyPayment(c *gin.Context) {
+	var verify dto.Verify
+	if err := c.ShouldBind(&verify); err != nil || verify.Status != "passed" && verify.Status != "failed" {
+		c.AbortWithStatusJSON(http.StatusBadRequest, helper.BuildErrorResponse("error", err.Error(), helper.EmptyObj{}))
+		return
+	}
+
+	res, err2 := ctrl.transactionCase.VerifyPayment(verify)
+	if err2 != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, helper.BuildErrorResponse("error", err2.Error(), helper.EmptyObj{}))
+		return
+	}
+	c.JSON(http.StatusOK, helper.BuildResponse(true, "OK!", helper.BuildResponse(true, "Success Update Data", res)))
+
 }

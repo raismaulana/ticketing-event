@@ -14,6 +14,7 @@ import (
 	"github.com/mashingan/smapping"
 	"github.com/raismaulana/ticketing-event/app/dto"
 	"github.com/raismaulana/ticketing-event/app/entity"
+	"github.com/raismaulana/ticketing-event/app/helper"
 	"github.com/raismaulana/ticketing-event/app/repository"
 )
 
@@ -25,6 +26,7 @@ type TransactionCase interface {
 	Delete(id uint64, deleted_at time.Time) (entity.Transaction, error)
 	BuyEvent(input dto.BuyEventDTO) (entity.Transaction, error)
 	UploadReceipt(input dto.UploadReceipt) (entity.Transaction, error)
+	VerifyPayment(input dto.Verify) (entity.Transaction, error)
 }
 
 type transactionCase struct {
@@ -162,4 +164,24 @@ func (service *transactionCase) UploadReceipt(input dto.UploadReceipt) (entity.T
 	log.Println(path)
 	res, errRes := service.transactionRepository.UploadReceipt(input.ID, path)
 	return res, errRes
+}
+
+func (service *transactionCase) VerifyPayment(input dto.Verify) (entity.Transaction, error) {
+	_, err := service.transactionRepository.VerifyPayment(input.TransactionId, input.Status)
+	if err != nil {
+		return entity.Transaction{}, err
+	}
+
+	res, err2 := service.transactionRepository.GetUserAndEventByID(input.TransactionId)
+	if err2 != nil {
+		return entity.Transaction{}, err
+	}
+	if input.Status == "passed" {
+		helper.SendMail(res.Email, "Here We Bring Your Webinar's Link", "we received your payment, here is your link:"+res.Link)
+	} else if input.Status == "failed" {
+		helper.SendMail(res.Email, "Failed Payment", "Sorry, your payment is invalid:")
+		service.eventRepository.UpdateQuantity(res.Eid)
+
+	}
+	return entity.Transaction{}, nil
 }

@@ -6,8 +6,8 @@ import (
 )
 
 type ReportCase interface {
-	FetchAllReportEvent()
-	FetchAllReportEventByCreator(creator_id uint64, sortf string, sorta string) ([]entity.EventReport, error)
+	FetchAllReportUserBoughtEvent() ([]entity.ReportTransaction, error)
+	FetchAllReportEventByCreator(creator_id string, sortf string, sorta string) ([]entity.EventReport, error)
 }
 
 type reportCase struct {
@@ -24,10 +24,16 @@ func NewReportCase(userRepository repository.UserRepository, eventRepository rep
 	}
 }
 
-func (service *reportCase) FetchAllReportEvent() {
+func (service *reportCase) FetchAllReportUserBoughtEvent() ([]entity.ReportTransaction, error) {
+	res, err := service.transactionRepository.FetchAllUserBoughtEvent()
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
-func (service *reportCase) FetchAllReportEventByCreator(creator_id uint64, sortf string, sorta string) ([]entity.EventReport, error) {
+func (service *reportCase) FetchAllReportEventByCreator(creator_id string, sortf string, sorta string) ([]entity.EventReport, error) {
+
 	eventReport, err := service.eventRepository.GetEventReport(creator_id, sortf, sorta)
 	participants, err2 := service.userRepository.GetParticipant(creator_id)
 	if err != nil || err2 != nil {

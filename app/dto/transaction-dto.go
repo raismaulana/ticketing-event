@@ -26,3 +26,8 @@ type UploadReceipt struct {
 	ID            uint64 `json:"transaction_id" form:"transaction_id" binding:"required"`
 	ImgReceipt    string `json:"receipt" form:"receipt" binding:"required"`
 }
+
+type Verify struct {
+	TransactionId uint64 `form:"transaction_id" json:"transaction_id" binding:"required"`
+	Status        string `form:"status" json:"status" binding:"required"`
+}
