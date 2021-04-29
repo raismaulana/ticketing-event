@@ -18,6 +18,7 @@ type TransactionRepository interface {
 	VerifyPayment(id uint64, status string) (entity.Transaction, error)
 	GetUserAndEventByID(id uint64) (entity.TransactionUserEvent, error)
 	FetchAllUserBoughtEvent() ([]entity.ReportTransaction, error)
+	GetPendingTransaction() ([]entity.TransactionUserEvent, error)
 }
 
 type transactionRepository struct {
@@ -77,11 +78,18 @@ func (db *transactionRepository) VerifyPayment(id uint64, status string) (entity
 
 func (db *transactionRepository) GetUserAndEventByID(id uint64) (entity.TransactionUserEvent, error) {
 	var detailTransaction entity.TransactionUserEvent
-	tx := db.connection.Raw("SELECT p.email as email, e.link_webinar as link, e.id as eid FROM transaction t JOIN user p ON t.participant_id = p.id JOIN event e ON t.event_id ON e.id WHERE t.id = ?", id).Scan(&detailTransaction)
+	tx := db.connection.Raw("SELECT p.email as email, e.link_webinar as link, e.id as eid FROM transaction t JOIN users p ON t.participant_id = p.id JOIN event e ON t.event_id = e.id WHERE t.id = ?", id).Scan(&detailTransaction)
 	return detailTransaction, tx.Error
 }
+
 func (db *transactionRepository) FetchAllUserBoughtEvent() ([]entity.ReportTransaction, error) {
 	var reportTransaction []entity.ReportTransaction
 	tx := db.connection.Raw("SELECT p.id as pid, p.fullname, p.email, e.id as eid, e.title_event FROM `users` c JOIN event e on c.id = e.creator_id JOIN transaction t on e.id = t.event_id JOIN users p on t.participant_id = p.id WHERE t.status_payment = 'passed' AND t.deleted_at IS NULL").Scan(&reportTransaction)
 	return reportTransaction, tx.Error
+}
+
+func (db *transactionRepository) GetPendingTransaction() ([]entity.TransactionUserEvent, error) {
+	var detailTransaction []entity.TransactionUserEvent
+	tx := db.connection.Raw("SELECT p.email as email, e.link_webinar as link, e.id as eid FROM transaction t JOIN users p ON t.participant_id = p.id JOIN event e ON t.event_id = e.id WHERE t.status_payment IS NULL AND t.deleted_at IS NULL").Scan(&detailTransaction)
+	return detailTransaction, tx.Error
 }

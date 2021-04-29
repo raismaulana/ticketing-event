@@ -54,7 +54,7 @@ func (service *jwtCase) GenerateToken(userID string, role string) string {
 func (service *jwtCase) ValidateToken(encodedToken string) (*jwt.Token, error) {
 	return jwt.Parse(encodedToken, func(token *jwt.Token) (interface{}, error) {
 		if _, isvalid := token.Method.(*jwt.SigningMethodHMAC); !isvalid {
-			return nil, fmt.Errorf("Invalid token %v", token.Header["alg"])
+			return nil, fmt.Errorf("invalid token %v", token.Header["alg"])
 
 		}
 		return []byte(service.secretKey), nil
@@ -64,7 +64,7 @@ func (service *jwtCase) ValidateToken(encodedToken string) (*jwt.Token, error) {
 
 func getSecretKey() string {
 	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
+	if secret != "" {
 		secret = "raiz"
 	}
 	return secret
@@ -72,7 +72,7 @@ func getSecretKey() string {
 
 func getIssuer() string {
 	issuer := os.Getenv("JWT_ISSUER")
-	if issuer == "" {
+	if issuer != "" {
 		issuer = "raiz"
 	}
 	return issuer

@@ -136,7 +136,7 @@ func (ctrl *transactionController) BuyEvent(c *gin.Context) {
 	}
 	user, err := ctrl.userCase.GetByID(parsedparticipantId)
 	if err == nil {
-		helper.SendMail(user.Email, "Pay Your Event ticket", "You can transafer using this method")
+		go helper.SendMail(user.Email, "Pay Your Event ticket", "You can transafer using this method")
 	}
 	c.JSON(http.StatusCreated, helper.BuildResponse(true, "Check out success, check your email", transaction))
 }

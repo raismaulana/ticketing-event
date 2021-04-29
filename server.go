@@ -1,14 +1,14 @@
 package main
 
 import (
-	"fmt"
-	"sync"
 	"time"
 
 	"github.com/casbin/casbin"
 	"github.com/gin-gonic/gin"
+	"github.com/go-co-op/gocron"
 	"github.com/go-redis/redis/v8"
 	"github.com/raismaulana/ticketing-event/app/config"
+	"github.com/raismaulana/ticketing-event/app/delivery/background"
 	"github.com/raismaulana/ticketing-event/app/delivery/controller"
 	"github.com/raismaulana/ticketing-event/app/delivery/middleware"
 	"github.com/raismaulana/ticketing-event/app/repository"
@@ -17,12 +17,13 @@ import (
 )
 
 var (
-	e                     *casbin.Enforcer                 = casbin.NewEnforcer("app/config/casbin-model.conf", "app/config/casbin-policy.csv")
 	db                    *gorm.DB                         = config.SetupDatabaseConnection()
+	e                     *casbin.Enforcer                 = casbin.NewEnforcer("app/config/casbin-model.conf", "app/config/casbin-policy.csv")
 	rdb                   *redis.Client                    = redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: "", DB: 0})
 	eventRepository       repository.EventRepository       = repository.NewEventRepository(db)
 	userRepository        repository.UserRepository        = repository.NewUserRepository(db)
 	transactionRepository repository.TransactionRepository = repository.NewTransactionRepository(db)
+	backgroundCase        usecase.BackgroundCase           = usecase.NewBackgroundCase(transactionRepository, eventRepository, userRepository)
 	authCase              usecase.AuthCase                 = usecase.NewAuthCase(userRepository)
 	eventCase             usecase.EventCase                = usecase.NewEventCase(eventRepository)
 	jwtCase               usecase.JWTCase                  = usecase.NewJWTCase()
@@ -35,18 +36,16 @@ var (
 	transactionController controller.TransactionController = controller.NewTransactionController(transactionCase, userCase, redisCase)
 	userController        controller.UserController        = controller.NewUserController(userCase, redisCase)
 	reportController      controller.ReportController      = controller.NewReportController(reportCase)
-	wg                    sync.WaitGroup
+	backgroundTask        background.BackgroundTask        = background.NewBackgroundTask(backgroundCase)
 )
-
-func checkExpire() {
-	for i := 1; i < 5; i++ {
-		fmt.Println(time.Now())
-	}
-}
 
 func main() {
 	defer config.CloseDatabaseConnection(db)
-	go checkExpire()
+
+	s := gocron.NewScheduler(time.Local)
+	initBackgroundTask(s)
+	defer s.Stop()
+
 	r := gin.Default()
 	initRoutes(r)
 
@@ -65,7 +64,7 @@ func initRoutes(r *gin.Engine) {
 	{
 		userRoutes := routes.Group("/user")
 		{
-			userRoutes.GET("/", userController.Fetch)
+			userRoutes.GET("/", middleware.GetCache(redisCase), userController.Fetch)
 			userRoutes.GET("/:id", userController.GetByID)
 			userRoutes.PUT("/update", userController.Update)
 			userRoutes.DELETE("/delete/:id", userController.Delete)
@@ -84,7 +83,7 @@ func initRoutes(r *gin.Engine) {
 		transactionRoutes := routes.Group("/transaction")
 		{
 			transactionRoutes.POST("/insert", transactionController.Insert)
-			transactionRoutes.GET("/", transactionController.Fetch)
+			transactionRoutes.GET("/", middleware.GetCache(redisCase), transactionController.Fetch)
 			transactionRoutes.GET("/:id", transactionController.GetByID)
 			transactionRoutes.PUT("/update", transactionController.Update)
 			transactionRoutes.DELETE("/delete/:id", transactionController.Delete)
@@ -95,8 +94,14 @@ func initRoutes(r *gin.Engine) {
 
 		customRoutes := routes.Group("")
 		{
-			customRoutes.GET("/report/transaction", reportController.FetchAllReportUserBoughtEvent)
+			customRoutes.GET("/report/transaction", middleware.GetCache(redisCase), reportController.FetchAllReportUserBoughtEvent)
 			customRoutes.GET("/report/creator", reportController.FetchAllReportEventByCreator)
 		}
 	}
+}
+
+func initBackgroundTask(s *gocron.Scheduler) {
+	s.Every(1).Day().StartAt(time.Date(2021, time.April, 29, 11, 0, 00, 0, time.Local)).Tag("Reminder").Do(backgroundTask.SendReminderPayment)
+	s.Every(1).Day().StartAt(time.Date(2021, time.April, 29, 5, 0, 00, 0, time.Local)).Tag("Promotion").Do(backgroundTask.SendPromotionEvent)
+	s.StartAsync()
 }

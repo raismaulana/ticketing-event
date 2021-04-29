@@ -105,24 +105,24 @@ func (service *transactionCase) BuyEvent(input dto.BuyEventDTO) (entity.Transact
 		if transaction.StatusPayment == "passed" {
 			log.Println(transaction.StatusPayment, ":b ", reflect.TypeOf(transaction.StatusPayment))
 
-			return transaction, errors.New("aYou can't buy same ticket more than one")
+			return transaction, errors.New("you can't buy same ticket more than one")
 		} else if transaction.StatusPayment == "failed" {
 			log.Println(transaction.StatusPayment, ":c ", reflect.TypeOf(transaction.StatusPayment))
 
-			return transaction, errors.New("Your transaction failed.")
+			return transaction, errors.New("your transaction failed")
 		} else {
 			log.Println(transaction.StatusPayment, ":d ", reflect.TypeOf(transaction.StatusPayment))
-			return transaction, errors.New("You already checked out this ticket, complete your transaction please.")
+			return transaction, errors.New("you already checked out this ticket, complete your transaction please")
 
 		}
 	} else {
 		var transaction entity.Transaction
 		event, err := service.eventRepository.GetByID(input.EventID)
 		if err != nil {
-			return transaction, errors.New("Event not found")
+			return transaction, errors.New("event not found")
 		}
 		if event.Quantity == 0 {
-			return transaction, errors.New("Event is out of stock")
+			return transaction, errors.New("event is out of stock")
 		}
 
 		if err := smapping.FillStruct(&transaction, smapping.MapFields(&input)); err != nil {
@@ -143,13 +143,13 @@ func (service *transactionCase) UploadReceipt(input dto.UploadReceipt) (entity.T
 
 	unbased, err := base64.StdEncoding.DecodeString(input.ImgReceipt)
 	if err != nil {
-		return transaction, errors.New("Cannot decode b64")
+		return transaction, errors.New("cannot decode b64")
 	}
 
 	r := bytes.NewReader(unbased)
 	im, err := png.Decode(r)
 	if err != nil {
-		return transaction, errors.New("Bad png")
+		return transaction, errors.New("bad png")
 	}
 	a := strconv.Itoa(int(input.ID))
 	b := strconv.Itoa(int(input.ParticipantId))
@@ -157,7 +157,7 @@ func (service *transactionCase) UploadReceipt(input dto.UploadReceipt) (entity.T
 	path := "data/" + base64.StdEncoding.EncodeToString([]byte(a+b+c))
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0777)
 	if err != nil {
-		return transaction, errors.New("Cannot open file")
+		return transaction, errors.New("cannot open file")
 	}
 
 	png.Encode(f, im)
@@ -177,9 +177,9 @@ func (service *transactionCase) VerifyPayment(input dto.Verify) (entity.Transact
 		return entity.Transaction{}, err
 	}
 	if input.Status == "passed" {
-		helper.SendMail(res.Email, "Here We Bring Your Webinar's Link", "we received your payment, here is your link:"+res.Link)
+		go helper.SendMail(res.Email, "Here We Bring Your Webinar's Link", "we received your payment, here is your link:"+res.Link)
 	} else if input.Status == "failed" {
-		helper.SendMail(res.Email, "Failed Payment", "Sorry, your payment is invalid:")
+		go helper.SendMail(res.Email, "Failed Payment", "Sorry, your payment is invalid:")
 		service.eventRepository.UpdateQuantity(res.Eid)
 
 	}

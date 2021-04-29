@@ -11,6 +11,7 @@ import (
 type UserRepository interface {
 	Fetch() ([]entity.User, error)
 	GetByID(id uint64) (entity.User, error)
+	GetByRole(role string) ([]entity.User, error)
 	Update(user entity.User) (entity.User, error)
 	GetByUsername(username string) (entity.User, error)
 	GetByEmail(email string) (entity.User, error)
@@ -42,6 +43,13 @@ func (db *userRepository) GetByID(id uint64) (entity.User, error) {
 	var user entity.User
 	// tx := db.connection.Where("id = ?", id).Take(&user)
 	tx := db.connection.Raw("SELECT * FROM `users` WHERE `users`.`deleted_at` IS NULL AND `users`.`id` = ?", id).Scan(&user)
+	return user, tx.Error
+}
+
+func (db *userRepository) GetByRole(role string) ([]entity.User, error) {
+	var user []entity.User
+	// tx := db.connection.Where("id = ?", id).Take(&user)
+	tx := db.connection.Raw("SELECT * FROM `users` WHERE `users`.`deleted_at` IS NULL AND `users`.`role` = ?", role).Scan(&user)
 	return user, tx.Error
 }
 
