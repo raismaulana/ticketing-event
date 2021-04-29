@@ -13,11 +13,13 @@ import (
 	"github.com/raismaulana/ticketing-event/app/delivery/middleware"
 	"github.com/raismaulana/ticketing-event/app/repository"
 	"github.com/raismaulana/ticketing-event/app/usecase"
+	"github.com/streadway/amqp"
 	"gorm.io/gorm"
 )
 
 var (
 	db                    *gorm.DB                         = config.SetupDatabaseConnection()
+	amqpConn              *amqp.Connection                 = config.SetupRabbitmqConnection()
 	e                     *casbin.Enforcer                 = casbin.NewEnforcer("app/config/casbin-model.conf", "app/config/casbin-policy.csv")
 	rdb                   *redis.Client                    = redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: "", DB: 0})
 	eventRepository       repository.EventRepository       = repository.NewEventRepository(db)
@@ -36,11 +38,12 @@ var (
 	transactionController controller.TransactionController = controller.NewTransactionController(transactionCase, userCase, redisCase)
 	userController        controller.UserController        = controller.NewUserController(userCase, redisCase)
 	reportController      controller.ReportController      = controller.NewReportController(reportCase)
-	backgroundTask        background.BackgroundTask        = background.NewBackgroundTask(backgroundCase)
+	backgroundTask        background.BackgroundTask        = background.NewBackgroundTask(backgroundCase, amqpConn)
 )
 
 func main() {
 	defer config.CloseDatabaseConnection(db)
+	defer amqpConn.Close()
 
 	s := gocron.NewScheduler(time.Local)
 	initBackgroundTask(s)
@@ -48,7 +51,6 @@ func main() {
 
 	r := gin.Default()
 	initRoutes(r)
-
 	r.Run()
 }
 
@@ -101,7 +103,9 @@ func initRoutes(r *gin.Engine) {
 }
 
 func initBackgroundTask(s *gocron.Scheduler) {
-	s.Every(1).Day().StartAt(time.Date(2021, time.April, 29, 11, 0, 00, 0, time.Local)).Tag("Reminder").Do(backgroundTask.SendReminderPayment)
-	s.Every(1).Day().StartAt(time.Date(2021, time.April, 29, 5, 0, 00, 0, time.Local)).Tag("Promotion").Do(backgroundTask.SendPromotionEvent)
+	go backgroundTask.ListenerReminderPayment()
+	go backgroundTask.ListenerPromotionEvent()
+	s.Every(1).Day().StartAt(time.Date(2021, time.April, 30, 5, 45, 00, 0, time.Local)).Tag("Reminder").Do(backgroundTask.SendReminderPayment)
+	s.Every(1).Day().StartAt(time.Date(2021, time.April, 29, 10, 45, 10, 0, time.Local)).Tag("Promotion").Do(backgroundTask.SendPromotionEvent)
 	s.StartAsync()
 }
