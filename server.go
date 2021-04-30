@@ -106,6 +106,6 @@ func initBackgroundTask(s *gocron.Scheduler) {
 	go backgroundTask.ListenerReminderPayment()
 	go backgroundTask.ListenerPromotionEvent()
 	s.Every(1).Day().StartAt(time.Date(2021, time.April, 30, 5, 45, 00, 0, time.Local)).Tag("Reminder").Do(backgroundTask.SendReminderPayment)
-	s.Every(1).Day().StartAt(time.Date(2021, time.April, 29, 10, 45, 10, 0, time.Local)).Tag("Promotion").Do(backgroundTask.SendPromotionEvent)
+	s.Every(1).Day().StartAt(time.Date(2021, time.April, 30, 10, 45, 00, 0, time.Local)).Tag("Promotion").Do(backgroundTask.SendPromotionEvent)
 	s.StartAsync()
 }

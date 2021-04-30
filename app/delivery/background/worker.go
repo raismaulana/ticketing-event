@@ -75,7 +75,7 @@ func (b *backgroundTask) SendReminderPayment() {
 func (b *backgroundTask) SendPromotionEvent() {
 	log.Println("Promotion start for today")
 	events, users, err := b.backgroundCase.GetPromotionEvent()
-	q := setupQueue(b.ch, REMINDER_QUEUE_NAME)
+	q := setupQueue(b.ch, PROMOTION_QUEUE_NAME)
 
 	if err == nil && len(events) > 0 && len(users) > 0 {
 		for _, v := range users {
@@ -145,7 +145,7 @@ func (b *backgroundTask) ListenerPromotionEvent() {
 			t := strings.Split(string(d.Body), "/")
 			helper.SendMail(t[0], "Cool Event Will Be Held", "Join this event "+t[1]+".")
 
-			log.Println("send ", t[0], " to ", t[1])
+			log.Println("send ", t[1], " to ", t[0])
 		}
 	}()
 
